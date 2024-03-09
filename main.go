@@ -4,22 +4,61 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
 	"regexp"
 )
 
 const (
 	goDownloadURL = "https://go.dev/dl/"
-	// goDownloadPath    = "/tmp/"
-	goExtractPathRoot = "/usr/local/"
-	goFullPath        = goExtractPathRoot + "go"
 )
 
 var (
-	tempDir = ""
+	tempDir           = ""
+	goExtractPathRoot = "/usr/local/"
+	goFullPath        = ""
 )
 
 func main() {
 	tempDir = os.TempDir()
+
+	// Define a string flag
+	// Check if at least one argument is provided
+	if len(os.Args) < 2 {
+		fmt.Println("Usage: program [user|global|<custom path>]")
+		os.Exit(1)
+	}
+
+	// The first parameter after the program name
+	installType := os.Args[1]
+
+	// Determine the install path based on the installType flag
+	switch installType {
+	case "user":
+		homeDir, err := os.UserHomeDir()
+		if err != nil {
+			fmt.Println("Error getting user home directory:", err)
+			os.Exit(1)
+		}
+		goExtractPathRoot = homeDir
+	case "global":
+		goExtractPathRoot = "/usr/local/"
+	default:
+		if installType == "" {
+			fmt.Println("Usage: program --installType=[user|global|<custom path>]")
+			os.Exit(1)
+		}
+		goExtractPathRoot = installType
+	}
+
+	// Check if the installPath is a valid, writable path
+	if isWritable(goExtractPathRoot) {
+		fmt.Printf("Install path is set to: %s\n", goExtractPathRoot)
+	} else {
+		fmt.Println("The provided install path is not valid or not writable.")
+		os.Exit(1)
+	}
+
+	goFullPath = goExtractPathRoot + "go"
 
 	fmt.Println("Downloading Go Data to get the latest version...")
 	htmlContent, err := downloadHTML(goDownloadURL)
@@ -85,4 +124,18 @@ func buildFilename(version string) string {
 
 func removeGoFolder(path string) error {
 	return os.RemoveAll(path)
+}
+
+// isWritable checks if the path is writable
+func isWritable(path string) bool {
+	// Try creating a temporary file at the path to check for write permission
+	tmpFilePath := filepath.Join(path, ".tmp-check")
+	defer os.Remove(tmpFilePath) // Clean up after the check
+
+	file, err := os.Create(tmpFilePath)
+	if err != nil {
+		return false
+	}
+	file.Close()
+	return true
 }
