@@ -11,7 +11,6 @@ A simple tool to install and update go to its latest version
 
 [![Dependancies](https://img.shields.io/librariesio/github/earentir/updatego)]()
 
-
 ## Contributing
 
 Contributions are always welcome!
@@ -28,15 +27,13 @@ Please report any security vulnerabilities to the project using issues or direct
 
 ## Roadmap
 
-- Create a finalised version 1 of the package
-- Add support for downloading binaries from releases
-- Add support for github releases
-- Add support for gitlab releases
+- Check paths
+- Install go
+- make changes in bashrc
 
 ## Authors
 
 - [@earentir](https://www.github.com/earentir)
-
 
 ## License
 
