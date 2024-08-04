@@ -12,7 +12,8 @@ import (
 )
 
 func main() {
-	app := cli.App("updatego", "A simple Go version manager")
+	app := cli.App("updatego", "A simple golang version manager")
+	app.Version("v version", "updatego 1.3.27")
 
 	app.Command("install", "Install Go", func(cmd *cli.Cmd) {
 		version := cmd.StringOpt("version", "", "Specify Go version to install")
