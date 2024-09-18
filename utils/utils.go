@@ -42,6 +42,10 @@ func DownloadFile(url string) (string, error) {
 	}
 	defer resp.Body.Close()
 
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("unexpected status code: %d", resp.StatusCode)
+	}
+
 	tempDir := os.TempDir()
 	tempfile := filepath.Join(tempDir, regexp.MustCompile(`[^/]+$`).FindString(url))
 
@@ -103,28 +107,22 @@ func DownloadFileWithProgress(url string) (string, error) {
 
 // ExtractTarGz extracts a tarball to a target directory
 func ExtractTarGz(filePath, extractPath string, isMainGoDir bool) error {
-	// Open the gzip file
 	gzFile, err := os.Open(filePath)
 	if err != nil {
 		return err
 	}
 	defer gzFile.Close()
 
-	// Create a gzip reader
 	gzReader, err := gzip.NewReader(gzFile)
 	if err != nil {
 		return err
 	}
 	defer gzReader.Close()
 
-	// Create a tar reader
 	tarReader := tar.NewReader(gzReader)
 
-	// Iterate through the files in the tar archive
 	for {
 		header, err := tarReader.Next()
-
-		// If no more files are found, break
 		if err == io.EOF {
 			break
 		}
@@ -133,7 +131,6 @@ func ExtractTarGz(filePath, extractPath string, isMainGoDir bool) error {
 		}
 
 		var targetPath string
-		// Ensure the correct path, whether the tarball has "go/" prefix or not
 		if strings.HasPrefix(header.Name, "go/") {
 			targetPath = filepath.Join(extractPath, strings.TrimPrefix(header.Name, "go/"))
 		} else {
@@ -142,27 +139,28 @@ func ExtractTarGz(filePath, extractPath string, isMainGoDir bool) error {
 
 		switch header.Typeflag {
 		case tar.TypeDir:
-			// Create the directory with the same permissions as the tar header
 			if err := os.MkdirAll(targetPath, os.FileMode(header.Mode)); err != nil {
 				return err
 			}
 		case tar.TypeReg:
-			// Ensure the directory exists
 			if err := os.MkdirAll(filepath.Dir(targetPath), os.FileMode(0755)); err != nil {
 				return err
 			}
-			// Create the file with the same permissions as the tar header
 			outFile, err := os.OpenFile(targetPath, os.O_CREATE|os.O_RDWR, os.FileMode(header.Mode))
 			if err != nil {
 				return err
 			}
-
-			// Copy the file data from the tar archive to the file
 			if _, err := io.Copy(outFile, tarReader); err != nil {
 				outFile.Close()
 				return err
 			}
 			outFile.Close()
+		case tar.TypeSymlink:
+			if err := os.Symlink(header.Linkname, targetPath); err != nil {
+				return err
+			}
+		default:
+			return fmt.Errorf("unknown type: %b in %s", header.Typeflag, header.Name)
 		}
 	}
 

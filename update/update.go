@@ -36,6 +36,16 @@ func Go() {
 		os.Exit(1)
 	}
 
+	fileInfo, err := os.Stat(filePath)
+	if err != nil {
+		fmt.Printf("Error checking downloaded file: %v\n", err)
+		os.Exit(1)
+	}
+	if fileInfo.Size() == 0 {
+		fmt.Println("Error: Downloaded file is empty")
+		os.Exit(1)
+	}
+
 	goExtractPathRoot := "/usr/local/"
 	goFullPath := filepath.Join(goExtractPathRoot, "go")
 
@@ -45,12 +55,14 @@ func Go() {
 			parsedGoVersion, _ := utils.ParseGoVersion(goVersion)
 			backupPath := filepath.Join(goExtractPathRoot, "go-"+parsedGoVersion)
 			if err := os.Rename(goFullPath, backupPath); err != nil {
-				fmt.Println("Error renaming the old Go folder:", err)
-				os.Exit(1)
+				fmt.Printf("Error backing up old Go version: %v\n", err)
+				fmt.Println("Proceeding with update without backup...")
+			} else {
+				fmt.Printf("Old Go version backed up to: %s\n", backupPath)
 			}
 		} else {
-			fmt.Println("Error checking current Go version:", err)
-			os.Exit(1)
+			fmt.Printf("Error checking current Go version: %v\n", err)
+			fmt.Println("Proceeding with update...")
 		}
 	}
 
@@ -59,4 +71,6 @@ func Go() {
 		fmt.Println("Error extracting the Go archive:", err)
 		os.Exit(1)
 	}
+
+	fmt.Printf("Go has been successfully updated to version %s\n", version)
 }
