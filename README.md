@@ -3,6 +3,27 @@
 A simple tool to install and update go to its latest version
 
 ## Usage/Examples
+0$ ./updatego 
+
+Usage: updatego [OPTIONS] COMMAND [arg...]
+
+A simple golang version manager
+                  
+Options:          
+  -v, --version   Show the version and exit
+      --verbose   Enable verbose output
+                  
+Commands:         
+  install         Install Go
+  status          Check Go installation status
+  latest          Print the latest Go version available
+  update          Update Go to the latest version
+  list            List all local Go versions
+  switch          Switch to a specific Go version
+                  
+Run 'updatego COMMAND --help' for more information on a command.
+
+
 
 ## Dependancies & Documentation
 [![Go Mod](https://img.shields.io/github/go-mod/go-version/earentir/updatego)]()
