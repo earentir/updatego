@@ -13,6 +13,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"updatego/installer/config"
 )
 
 const (
@@ -407,5 +408,22 @@ func copyFile(src, dst string) error {
 		return err
 	}
 
+	return nil
+}
+
+func Log(message string) {
+	if config.GlobalConfig.Verbose {
+		fmt.Println(message)
+	}
+}
+
+func VerifyDownloadedFile(filePath string) error {
+	fileInfo, err := os.Stat(filePath)
+	if err != nil {
+		return fmt.Errorf("error checking downloaded file: %v", err)
+	}
+	if fileInfo.Size() == 0 {
+		return fmt.Errorf("downloaded file is empty")
+	}
 	return nil
 }
