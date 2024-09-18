@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"updatego/installer/config"
+	"updatego/config"
 	"updatego/utils"
 )
 
