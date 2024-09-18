@@ -3,7 +3,8 @@
 A simple tool to install and update go to its latest version
 
 ## Usage/Examples
-0$ ./updatego 
+```
+$ ./updatego 
 
 Usage: updatego [OPTIONS] COMMAND [arg...]
 
@@ -22,7 +23,7 @@ Commands:
   switch          Switch to a specific Go version
                   
 Run 'updatego COMMAND --help' for more information on a command.
-
+```
 
 
 ## Dependancies & Documentation
