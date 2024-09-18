@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"updatego/installer/config"
 	"updatego/utils"
 )
 
@@ -36,41 +37,37 @@ func Go() {
 		os.Exit(1)
 	}
 
-	fileInfo, err := os.Stat(filePath)
-	if err != nil {
-		fmt.Printf("Error checking downloaded file: %v\n", err)
-		os.Exit(1)
-	}
-	if fileInfo.Size() == 0 {
-		fmt.Println("Error: Downloaded file is empty")
+	if err := utils.VerifyDownloadedFile(filePath); err != nil {
+		fmt.Printf("Error verifying downloaded file: %v\n", err)
 		os.Exit(1)
 	}
 
-	goExtractPathRoot := "/usr/local/"
-	goFullPath := filepath.Join(goExtractPathRoot, "go")
-
-	if utils.DirNotEmpty(goFullPath) {
-		goVersion, err := utils.CheckGoVersion(goFullPath)
-		if err == nil {
-			parsedGoVersion, _ := utils.ParseGoVersion(goVersion)
-			backupPath := filepath.Join(goExtractPathRoot, "go-"+parsedGoVersion)
-			if err := os.Rename(goFullPath, backupPath); err != nil {
-				fmt.Printf("Error backing up old Go version: %v\n", err)
-				fmt.Println("Proceeding with update without backup...")
-			} else {
-				fmt.Printf("Old Go version backed up to: %s\n", backupPath)
-			}
-		} else {
-			fmt.Printf("Error checking current Go version: %v\n", err)
-			fmt.Println("Proceeding with update...")
-		}
+	if utils.DirNotEmpty(config.GlobalConfig.GoFullPath) {
+		backupCurrentVersion()
 	}
 
 	fmt.Println("Extracting the new Go version...")
-	if err := utils.ExtractTarGz(filePath, goFullPath, true); err != nil {
+	if err := utils.ExtractTarGz(filePath, config.GlobalConfig.GoFullPath, true); err != nil {
 		fmt.Println("Error extracting the Go archive:", err)
 		os.Exit(1)
 	}
 
 	fmt.Printf("Go has been successfully updated to version %s\n", version)
+}
+
+func backupCurrentVersion() {
+	goVersion, err := utils.CheckGoVersion(config.GlobalConfig.GoFullPath)
+	if err == nil {
+		parsedGoVersion, _ := utils.ParseGoVersion(goVersion)
+		backupPath := filepath.Join(config.GlobalConfig.GoExtractPathRoot, "go-"+parsedGoVersion)
+		if err := os.Rename(config.GlobalConfig.GoFullPath, backupPath); err != nil {
+			fmt.Printf("Error backing up old Go version: %v\n", err)
+			fmt.Println("Proceeding with update without backup...")
+		} else {
+			fmt.Printf("Old Go version backed up to: %s\n", backupPath)
+		}
+	} else {
+		fmt.Printf("Error checking current Go version: %v\n", err)
+		fmt.Println("Proceeding with update...")
+	}
 }

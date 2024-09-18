@@ -5,6 +5,7 @@ import (
 	"os"
 
 	"updatego/installer"
+	"updatego/installer/config"
 	"updatego/local"
 	"updatego/update"
 
@@ -13,7 +14,13 @@ import (
 
 func main() {
 	app := cli.App("updatego", "A simple golang version manager")
-	app.Version("v version", "updatego 1.3.27")
+	app.Version("v version", "updatego 1.3.31")
+
+	verbose := app.BoolOpt("verbose", false, "Enable verbose output")
+
+	app.Before = func() {
+		config.GlobalConfig.Verbose = *verbose
+	}
 
 	app.Command("install", "Install Go", func(cmd *cli.Cmd) {
 		version := cmd.StringOpt("version", "", "Specify Go version to install")
