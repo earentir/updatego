@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"os"
 
+	"updatego/config"
 	"updatego/installer"
-	"updatego/installer/config"
 	"updatego/local"
 	"updatego/update"
 

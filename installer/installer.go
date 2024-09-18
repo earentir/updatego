@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"path/filepath"
 
-	"updatego/installer/config"
+	"updatego/config"
 	"updatego/local"
 	"updatego/utils"
 )

@@ -13,7 +13,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
-	"updatego/installer/config"
+	"updatego/config"
 )
 
 const (
