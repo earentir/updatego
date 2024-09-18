@@ -53,11 +53,8 @@ func main() {
 
 	app.Command("switch", "Switch to a specific Go version", func(cmd *cli.Cmd) {
 		version := cmd.StringArg("VERSION", "", "Go version to switch to")
+		cmd.Spec = "VERSION"
 		cmd.Action = func() {
-			if *version == "" {
-				fmt.Println("Please provide a version to switch to.")
-				os.Exit(1)
-			}
 			local.SwitchGoVersion(*version)
 		}
 	})

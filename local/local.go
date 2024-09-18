@@ -114,6 +114,16 @@ func SwitchGoVersion(version string) {
 	goFullPath = filepath.Join(goExtractPathRoot, "go")
 	targetPath := filepath.Join(goExtractPathRoot, "go-"+version)
 
+	// Check if we're already on the requested version
+	currentVersion, err := utils.CheckGoVersion(goFullPath)
+	if err == nil {
+		parsedCurrentVersion, _ := utils.ParseGoVersion(currentVersion)
+		if parsedCurrentVersion == version {
+			fmt.Printf("Already using Go version %s\n", version)
+			return
+		}
+	}
+
 	// Check if the target version exists locally
 	if !utils.IsDirExists(targetPath) {
 		fmt.Printf("Go version %s not found locally. Downloading...\n", version)
@@ -121,37 +131,41 @@ func SwitchGoVersion(version string) {
 		filename := utils.BuildFilename(version)
 		filePath, err := utils.DownloadAndVerifyFile(utils.GoDownloadURL + filename)
 		if err != nil {
-			fmt.Println("Error downloading the file:", err)
-			os.Exit(1)
+			fmt.Printf("Error downloading Go version %s: %v\n", version, err)
+			return
 		}
 
-		if err := os.Mkdir(targetPath, 0755); err != nil {
-			fmt.Println("Error creating directory for the new Go version:", err)
-			os.Exit(1)
+		if err := os.MkdirAll(targetPath, 0755); err != nil {
+			fmt.Printf("Error creating directory for Go version %s: %v\n", version, err)
+			return
 		}
 
 		fmt.Println("Extracting the Go version...")
 		if err := utils.ExtractTarGz(filePath, targetPath, false); err != nil {
-			fmt.Println("Error extracting the Go archive:", err)
-			os.Exit(1)
+			fmt.Printf("Error extracting Go version %s: %v\n", version, err)
+			return
 		}
 	}
 
 	// Rename the current Go folder
 	if utils.IsDirExists(goFullPath) {
-		currentVersion, _ := utils.CheckGoVersion(goFullPath)
+		currentVersion, err := utils.CheckGoVersion(goFullPath)
+		if err != nil {
+			fmt.Printf("Error checking current Go version: %v\n", err)
+			return
+		}
 		parsedCurrentVersion, _ := utils.ParseGoVersion(currentVersion)
 		currentBackupPath := filepath.Join(goExtractPathRoot, "go-"+parsedCurrentVersion)
 		if err := os.Rename(goFullPath, currentBackupPath); err != nil {
-			fmt.Println("Error renaming the current Go folder:", err)
-			os.Exit(1)
+			fmt.Printf("Error backing up current Go version: %v\n", err)
+			return
 		}
 	}
 
 	// Switch to the target version
 	if err := os.Rename(targetPath, goFullPath); err != nil {
-		fmt.Println("Error renaming the target Go folder:", err)
-		os.Exit(1)
+		fmt.Printf("Error switching to Go version %s: %v\n", version, err)
+		return
 	}
 
 	fmt.Printf("Switched to Go version %s successfully.\n", version)
