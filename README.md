@@ -48,10 +48,9 @@ Please report any security vulnerabilities to the project using issues or direct
  This project follows the go project code of conduct, please refer to https://go.dev/conduct for more details
 
 ## Roadmap
-
-- Check paths
-- Install go
-- make changes in bashrc
+- [x] Check paths
+- [x] Install go
+- [ ] make changes in bashrc
 
 ## Authors
 
