@@ -27,7 +27,13 @@ func DownloadHTML(url string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	defer resp.Body.Close()
+
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			fmt.Println("Error closing response body:", err)
+		}
+	}()
+
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return "", err
@@ -41,7 +47,11 @@ func DownloadFile(url string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			fmt.Println("Error closing response body:", err)
+		}
+	}()
 
 	if resp.StatusCode != http.StatusOK {
 		return "", fmt.Errorf("unexpected status code: %d", resp.StatusCode)
@@ -56,7 +66,12 @@ func DownloadFile(url string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	defer out.Close()
+
+	defer func() {
+		if err := out.Close(); err != nil {
+			fmt.Println("Error closing response body:", err)
+		}
+	}()
 
 	_, err = io.Copy(out, resp.Body)
 	return out.Name(), err
@@ -68,7 +83,14 @@ func DownloadFileWithProgress(url string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	defer resp.Body.Close()
+
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			fmt.Println("Error closing response body:", err)
+		}
+	}()
+
+	fmt.Println("URL:", url)
 
 	tempDir := os.TempDir()
 	tempfile := filepath.Join(tempDir, regexp.MustCompile(`[^/]+$`).FindString(url))
@@ -79,7 +101,11 @@ func DownloadFileWithProgress(url string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	defer out.Close()
+	defer func() {
+		if err := out.Close(); err != nil {
+			fmt.Println("Error closing response body:", err)
+		}
+	}()
 
 	var downloadedSize int64
 	buffer := make([]byte, 32*1024)
@@ -112,16 +138,23 @@ func ExtractTarGz(filePath, extractPath string, isMainGoDir bool) error {
 	if err != nil {
 		return err
 	}
-	defer gzFile.Close()
+	defer func() {
+		if err := gzFile.Close(); err != nil {
+			fmt.Println("Error closing response body:", err)
+		}
+	}()
 
 	gzReader, err := gzip.NewReader(gzFile)
 	if err != nil {
 		return err
 	}
-	defer gzReader.Close()
+	defer func() {
+		if err := gzReader.Close(); err != nil {
+			fmt.Println("Error closing response body:", err)
+		}
+	}()
 
 	tarReader := tar.NewReader(gzReader)
-
 	for {
 		header, err := tarReader.Next()
 		if err == io.EOF {
@@ -152,10 +185,16 @@ func ExtractTarGz(filePath, extractPath string, isMainGoDir bool) error {
 				return err
 			}
 			if _, err := io.Copy(outFile, tarReader); err != nil {
-				outFile.Close()
+				err := outFile.Close()
+				if err != nil {
+					return err
+				}
 				return err
 			}
-			outFile.Close()
+			err = outFile.Close()
+			if err != nil {
+				return err
+			}
 		case tar.TypeSymlink:
 			if err := os.Symlink(header.Linkname, targetPath); err != nil {
 				return err
@@ -173,7 +212,7 @@ func FindVersion(htmlContent string) (string, error) {
 	regex := regexp.MustCompile(`go(\d+\.\d+\.\d+)\.linux-amd64\.tar\.gz`)
 	matches := regex.FindStringSubmatch(htmlContent)
 	if len(matches) < 2 {
-		err := errors.New("No version found")
+		err := errors.New("no version found")
 		return "", err
 	}
 	return matches[1], nil
@@ -192,13 +231,21 @@ func RemoveGoFolder(path string) error {
 // IsWritable checks if a path is writable
 func IsWritable(path string) bool {
 	tmpFilePath := filepath.Join(path, ".tmp-check")
-	defer os.Remove(tmpFilePath)
+	defer func() {
+		if err := os.Remove(tmpFilePath); err != nil {
+			fmt.Println("Error closing response body:", err)
+		}
+	}()
 
 	file, err := os.Create(tmpFilePath)
 	if err != nil {
 		return false
 	}
-	file.Close()
+	defer func() {
+		if err := file.Close(); err != nil {
+			fmt.Println("Error closing response body:", err)
+		}
+	}()
 	return true
 }
 
@@ -253,7 +300,10 @@ func DetermineInstallPath(global, user bool, customPath string) string {
 // BackupOldGo backs up the old Go folder
 func BackupOldGo(backupPath, goFullPath string) {
 	if _, err := os.Stat(backupPath); !os.IsNotExist(err) {
-		os.RemoveAll(backupPath)
+		err := os.RemoveAll(backupPath)
+		if err != nil {
+			fmt.Println("Error removing old backup:", err)
+		}
 	}
 	if err := os.Rename(goFullPath, backupPath); err != nil {
 		fmt.Println("Error renaming the old Go folder:", err)
@@ -302,8 +352,16 @@ func DownloadAndVerifyFile(url string) (string, error) {
 	}
 
 	fmt.Printf("Write permission confirmed in temp directory: %s\n", os.TempDir())
-	tempFile.Close()
-	os.Remove(tempFile.Name())
+	defer func() {
+		if err := tempFile.Close(); err != nil {
+			fmt.Println("Error closing response body:", err)
+		}
+	}()
+
+	err = os.Remove(tempFile.Name())
+	if err != nil {
+		fmt.Printf("Error removing temporary file: %s\n", tempFile.Name())
+	}
 
 	return filePath, nil
 }
@@ -311,8 +369,14 @@ func DownloadAndVerifyFile(url string) (string, error) {
 // SetEnvironmentVariables sets the GOROOT and GOPATH environment variables
 func SetEnvironmentVariables(goFullPath string) {
 	fmt.Println("Setting up environment variables...")
-	os.Setenv("GOROOT", goFullPath)
-	os.Setenv("GOPATH", filepath.Join(os.Getenv("HOME"), "go"))
+	err := os.Setenv("GOROOT", goFullPath)
+	if err != nil {
+		fmt.Println("Error setting GOROOT:", err)
+	}
+	err = os.Setenv("GOPATH", filepath.Join(os.Getenv("HOME"), "go"))
+	if err != nil {
+		fmt.Println("Error setting GOPATH:", err)
+	}
 	fmt.Println("GOROOT set to:", goFullPath)
 	fmt.Println("GOPATH set to:", filepath.Join(os.Getenv("HOME"), "go"))
 }
@@ -387,13 +451,21 @@ func copyFile(src, dst string) error {
 	if err != nil {
 		return err
 	}
-	defer sourceFile.Close()
+	defer func() {
+		if err := sourceFile.Close(); err != nil {
+			fmt.Println("Error closing response body:", err)
+		}
+	}()
 
 	destFile, err := os.Create(dst)
 	if err != nil {
 		return err
 	}
-	defer destFile.Close()
+	defer func() {
+		if err := destFile.Close(); err != nil {
+			fmt.Println("Error closing response body:", err)
+		}
+	}()
 
 	if _, err := io.Copy(destFile, sourceFile); err != nil {
 		return err

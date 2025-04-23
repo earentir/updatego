@@ -12,9 +12,11 @@ import (
 	cli "github.com/jawher/mow.cli"
 )
 
+var appversion = "1.3.33"
+
 func main() {
 	app := cli.App("updatego", "A simple golang version manager")
-	app.Version("v version", "updatego 1.3.31")
+	app.Version("v version", fmt.Sprintf("updatego %s", appversion))
 
 	verbose := app.BoolOpt("verbose", false, "Enable verbose output")
 
