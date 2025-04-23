@@ -83,7 +83,6 @@ func installNewVersion(version string) {
 
 func installGoVersion(version, installPath string, isMainGoDir bool) error {
 	filename := utils.BuildFilename(version)
-
 	fmt.Printf("Downloading %s, writing to: %s\n", filename, filepath.Join(tempDir, filename))
 	filePath, err := utils.DownloadFileWithProgress(utils.GoDownloadURL + filename)
 	if err != nil {
