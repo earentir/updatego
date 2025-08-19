@@ -8,7 +8,7 @@ curl -fsSL https://github.com/earentir/updatego/releases/latest/download/updateg
 ```
 
 
-## Usage/Examples
+## Usage
 ```
 $ ./updatego
 
@@ -31,6 +31,26 @@ Commands:
 Run 'updatego COMMAND --help' for more information on a command.
 ```
 
+## Examples
+
+### Install current release
+```bash
+[root@themis ~]# updatego install
+```
+#### Expected Output
+```bash
+Installing Go version: 1.25.0
+Downloading go1.25.0.linux-amd64.tar.gz, writing to: go1.25.0.linux-amd64.tar.gz
+URL: https://go.dev/dl/go1.25.0.linux-amd64.tar.gz
+Writing to: /tmp/go1.25.0.linux-amd64.tar.gz
+####################################################################################################################
+Extracting the new Go version...
+Switching to the newly installed Go version: 1.25.0
+Switched to Go version 1.25.0 successfully.
+Setting up environment variables...
+GOROOT set to: /usr/local/go
+GOPATH set to: /root/go
+```
 
 ## Dependancies & Documentation
 [![Go Mod](https://img.shields.io/github/go-mod/go-version/earentir/updatego)]()
