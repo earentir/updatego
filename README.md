@@ -2,26 +2,32 @@
 
 A simple tool to install and update go to its latest version
 
+## Install
+```bash
+curl -fsSL https://github.com/earentir/updatego/releases/latest/download/updatego -o updatego && chmod +x updatego
+```
+
+
 ## Usage/Examples
 ```
-$ ./updatego 
+$ ./updatego
 
 Usage: updatego [OPTIONS] COMMAND [arg...]
 
 A simple golang version manager
-                  
-Options:          
+
+Options:
   -v, --version   Show the version and exit
       --verbose   Enable verbose output
-                  
-Commands:         
+
+Commands:
   install         Install Go
   status          Check Go installation status
   latest          Print the latest Go version available
   update          Update Go to the latest version
   list            List all local Go versions
   switch          Switch to a specific Go version
-                  
+
 Run 'updatego COMMAND --help' for more information on a command.
 ```
 
