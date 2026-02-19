@@ -15,7 +15,6 @@ import (
 var appversion = "1.3.35"
 
 var verbose bool
-var showVersion bool
 
 var rootCmd = &cobra.Command{
 	Use:   "updatego",
@@ -28,7 +27,8 @@ var rootCmd = &cobra.Command{
 
 func init() {
 	rootCmd.PersistentFlags().BoolVar(&verbose, "verbose", false, "Enable verbose output")
-	rootCmd.Flags().BoolVar(&showVersion, "version", false, "Show the version and exit")
+	rootCmd.Version = appversion
+	rootCmd.SetVersionTemplate("updatego {{.Version}}\n")
 
 	rootCmd.AddCommand(installCmd)
 	rootCmd.AddCommand(statusCmd)
@@ -106,10 +106,6 @@ var switchCmd = &cobra.Command{
 }
 
 func main() {
-	if len(os.Args) == 2 && (os.Args[1] == "--version" || os.Args[1] == "-version") {
-		fmt.Printf("updatego %s\n", appversion)
-		os.Exit(0)
-	}
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Println(err)
 		os.Exit(1)
