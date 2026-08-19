@@ -254,6 +254,16 @@ func buildFilenameFor(version, goos, goarch string) string {
 	return "go" + version + "." + osName + "-" + arch + ext
 }
 
+// HostOSArch returns the current machine as GOOS/GOARCH, matching `go version` output.
+func HostOSArch() string {
+	return runtime.GOOS + "/" + runtime.GOARCH
+}
+
+// IsHostPlatform reports whether osArch (for example "darwin/arm64") matches this machine.
+func IsHostPlatform(osArch string) bool {
+	return osArch == HostOSArch()
+}
+
 // RemoveGoFolder removes the Go folder
 func RemoveGoFolder(path string) error {
 	return os.RemoveAll(path)
