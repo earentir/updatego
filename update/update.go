@@ -56,18 +56,21 @@ func Go() {
 }
 
 func backupCurrentVersion() {
+	backupName := "unusable"
 	goVersion, err := utils.CheckGoVersion(config.GlobalConfig.GoFullPath)
-	if err == nil {
-		parsedGoVersion, _ := utils.ParseGoVersion(goVersion)
-		backupPath := filepath.Join(config.GlobalConfig.GoExtractPathRoot, "go-"+parsedGoVersion)
-		if err := os.Rename(config.GlobalConfig.GoFullPath, backupPath); err != nil {
-			fmt.Printf("Error backing up old Go version: %v\n", err)
-			fmt.Println("Proceeding with update without backup...")
-		} else {
-			fmt.Printf("Old Go version backed up to: %s\n", backupPath)
-		}
+	if err != nil {
+		fmt.Printf("Current Go installation cannot be executed (%v); moving it aside.\n", err)
 	} else {
-		fmt.Printf("Error checking current Go version: %v\n", err)
-		fmt.Println("Proceeding with update...")
+		parsedGoVersion, osArch := utils.ParseGoVersion(goVersion)
+		if parsedGoVersion != "" && parsedGoVersion != "Unknown version" {
+			backupName = parsedGoVersion
+		}
+		if !utils.IsHostPlatform(osArch) {
+			fmt.Printf("Current Go is %s; this machine is %s. Moving it aside.\n", osArch, utils.HostOSArch())
+		}
 	}
+
+	backupPath := filepath.Join(config.GlobalConfig.GoExtractPathRoot, "go-"+backupName)
+	utils.BackupOldGo(backupPath, config.GlobalConfig.GoFullPath)
+	fmt.Printf("Old Go version backed up to: %s\n", backupPath)
 }
