@@ -114,3 +114,16 @@ func TestFindVersionForMissingPlatform(t *testing.T) {
 		t.Fatal("expected error when darwin-arm64 archive is missing")
 	}
 }
+
+func TestIsHostPlatform(t *testing.T) {
+	host := runtime.GOOS + "/" + runtime.GOARCH
+	if !IsHostPlatform(host) {
+		t.Fatalf("IsHostPlatform(%q) = false; want true", host)
+	}
+	if IsHostPlatform("linux/amd64") && host != "linux/amd64" {
+		t.Fatalf("IsHostPlatform(linux/amd64) = true on %s", host)
+	}
+	if HostOSArch() != host {
+		t.Fatalf("HostOSArch() = %q; want %q", HostOSArch(), host)
+	}
+}
