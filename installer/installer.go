@@ -41,29 +41,33 @@ func handleExistingInstallation(version string, force bool) {
 	currentVersion, err := utils.CheckGoVersion(config.GlobalConfig.GoFullPath)
 	if err != nil {
 		fmt.Printf("Error checking current Go version: %v\n", err)
-		fmt.Println("Proceeding with installation...")
-		installNewVersion(version)
+		fmt.Println("Existing installation is unusable; replacing it.")
+		replaceOrInstall(version)
 		return
 	}
 
-	parsedCurrentVersion, _ := utils.ParseGoVersion(currentVersion)
-	fmt.Printf("Go is already installed. Current version: %s\n", parsedCurrentVersion)
+	parsedCurrentVersion, osArch := utils.ParseGoVersion(currentVersion)
+	fmt.Printf("Go is already installed. Current version: %s (%s)\n", parsedCurrentVersion, osArch)
 
-	if parsedCurrentVersion == version && !force {
+	wrongPlatform := !utils.IsHostPlatform(osArch)
+	if wrongPlatform {
+		fmt.Printf("Installed Go is %s, this machine is %s. Replacing it.\n", osArch, utils.HostOSArch())
+	}
+
+	if parsedCurrentVersion == version && !force && !wrongPlatform {
 		fmt.Printf("Go version %s is already installed. Use the --force flag to reinstall it.\n", version)
 		return
 	}
 
+	replaceOrInstall(version)
+}
+
+func replaceOrInstall(version string) {
 	localPath := filepath.Join(config.GlobalConfig.GoExtractPathRoot, "go-"+version)
 	if utils.IsDirExists(localPath) {
 		fmt.Printf("Go version %s is already available locally. Switching to this version.\n", version)
 		local.SwitchGoVersion(version)
 		return
-	}
-
-	if force {
-		backupPath := filepath.Join(config.GlobalConfig.GoExtractPathRoot, "go-"+parsedCurrentVersion)
-		utils.BackupOldGo(backupPath, config.GlobalConfig.GoFullPath)
 	}
 
 	installNewVersion(version)
