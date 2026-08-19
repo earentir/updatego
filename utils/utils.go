@@ -4,7 +4,6 @@ package utils
 import (
 	"archive/tar"
 	"compress/gzip"
-	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -12,6 +11,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"strings"
 	"updatego/config"
 )
@@ -207,20 +207,51 @@ func ExtractTarGz(filePath, extractPath string, isMainGoDir bool) error {
 	return nil
 }
 
-// FindVersion finds the Go version in the HTML content
+// GoPlatform returns the OS, architecture, and archive extension used in
+// official Go download filenames for the current machine.
+func GoPlatform() (osName, arch, ext string) {
+	return platformParts(runtime.GOOS, runtime.GOARCH)
+}
+
+func platformParts(goos, goarch string) (osName, arch, ext string) {
+	osName = goos
+	arch = goarch
+	if goos == "linux" && goarch == "arm" {
+		arch = "armv6l"
+	}
+	ext = ".tar.gz"
+	if goos == "windows" {
+		ext = ".zip"
+	}
+	return osName, arch, ext
+}
+
+// FindVersion finds the latest Go version for the current OS and architecture
+// in the HTML content from go.dev/dl.
 func FindVersion(htmlContent string) (string, error) {
-	regex := regexp.MustCompile(`go(\d+\.\d+\.\d+)\.linux-amd64\.tar\.gz`)
+	return findVersionFor(htmlContent, runtime.GOOS, runtime.GOARCH)
+}
+
+func findVersionFor(htmlContent, goos, goarch string) (string, error) {
+	osName, arch, ext := platformParts(goos, goarch)
+	pattern := fmt.Sprintf(`go(\d+\.\d+\.\d+)\.%s-%s%s`,
+		regexp.QuoteMeta(osName), regexp.QuoteMeta(arch), regexp.QuoteMeta(ext))
+	regex := regexp.MustCompile(pattern)
 	matches := regex.FindStringSubmatch(htmlContent)
 	if len(matches) < 2 {
-		err := errors.New("no version found")
-		return "", err
+		return "", fmt.Errorf("no version found for %s/%s", osName, arch)
 	}
 	return matches[1], nil
 }
 
-// BuildFilename builds the filename for the Go version
+// BuildFilename builds the official Go archive filename for the current OS and architecture.
 func BuildFilename(version string) string {
-	return "go" + version + ".linux-amd64.tar.gz"
+	return buildFilenameFor(version, runtime.GOOS, runtime.GOARCH)
+}
+
+func buildFilenameFor(version, goos, goarch string) string {
+	osName, arch, ext := platformParts(goos, goarch)
+	return "go" + version + "." + osName + "-" + arch + ext
 }
 
 // RemoveGoFolder removes the Go folder
