@@ -10,40 +10,58 @@ import (
 	"updatego/utils"
 )
 
-var (
-	tempDir = ""
-)
+// InstallGo installs the specified Go version.
+func InstallGo(version string, force, global, user bool, customPath string) error {
+	if err := utils.RefuseWindows(); err != nil {
+		return err
+	}
 
-// InstallGo installs the specified Go version
-func InstallGo(version string, force, global, user bool, customPath string) {
-	config.GlobalConfig.GoExtractPathRoot = utils.DetermineInstallPath(global, user, customPath)
-	config.GlobalConfig.GoFullPath = filepath.Join(config.GlobalConfig.GoExtractPathRoot, "go")
+	extractRoot, err := utils.ResolveInstallRoot(global, user, customPath)
+	if err != nil {
+		return err
+	}
+	config.ApplyExtractRoot(extractRoot)
 
 	if !utils.IsWritable(config.GlobalConfig.GoExtractPathRoot) {
-		fmt.Printf("Error: Installation directory %s is not writable\n", config.GlobalConfig.GoExtractPathRoot)
-		return
+		return fmt.Errorf("installation directory %s is not writable", config.GlobalConfig.GoExtractPathRoot)
 	}
 
 	if version == "" {
-		version = utils.GetVersionToInstall("")
+		version, err = utils.GetVersionToInstall("")
+		if err != nil {
+			return err
+		}
+	} else {
+		version, err = utils.GetVersionToInstall(version)
+		if err != nil {
+			return err
+		}
 	}
 
 	if utils.DirNotEmpty(config.GlobalConfig.GoFullPath) {
-		handleExistingInstallation(version, force)
+		if err := handleExistingInstallation(version, force); err != nil {
+			return err
+		}
 	} else {
-		installNewVersion(version)
+		if err := installNewVersion(version); err != nil {
+			return err
+		}
 	}
 
-	utils.SetEnvironmentVariables(config.GlobalConfig.GoFullPath)
+	if err := config.SaveExtractRoot(config.GlobalConfig.GoExtractPathRoot); err != nil {
+		return fmt.Errorf("install succeeded but could not save config: %w", err)
+	}
+
+	utils.PrintShellHints(config.GlobalConfig.GoFullPath)
+	return nil
 }
 
-func handleExistingInstallation(version string, force bool) {
+func handleExistingInstallation(version string, force bool) error {
 	currentVersion, err := utils.CheckGoVersion(config.GlobalConfig.GoFullPath)
 	if err != nil {
 		fmt.Printf("Error checking current Go version: %v\n", err)
 		fmt.Println("Existing installation is unusable; replacing it.")
-		replaceOrInstall(version)
-		return
+		return replaceOrInstall(version)
 	}
 
 	parsedCurrentVersion, osArch := utils.ParseGoVersion(currentVersion)
@@ -56,47 +74,46 @@ func handleExistingInstallation(version string, force bool) {
 
 	if parsedCurrentVersion == version && !force && !wrongPlatform {
 		fmt.Printf("Go version %s is already installed. Use the --force flag to reinstall it.\n", version)
-		return
+		return nil
 	}
 
-	replaceOrInstall(version)
+	return replaceOrInstall(version)
 }
 
-func replaceOrInstall(version string) {
+func replaceOrInstall(version string) error {
 	localPath := filepath.Join(config.GlobalConfig.GoExtractPathRoot, "go-"+version)
-	if utils.IsDirExists(localPath) {
+	if utils.GoTreeReady(localPath) {
 		fmt.Printf("Go version %s is already available locally. Switching to this version.\n", version)
-		local.SwitchGoVersion(version)
-		return
+		return local.SwitchGoVersion(version)
 	}
-
-	installNewVersion(version)
+	return installNewVersion(version)
 }
 
-func installNewVersion(version string) {
+func installNewVersion(version string) error {
 	targetPath := filepath.Join(config.GlobalConfig.GoExtractPathRoot, "go-"+version)
 	fmt.Printf("Installing Go version: %s\n", version)
-	if err := installGoVersion(version, targetPath, false); err != nil {
-		fmt.Printf("Error installing Go version %s: %v\n", version, err)
-		return
+	if err := installGoVersion(version, targetPath); err != nil {
+		return fmt.Errorf("error installing Go version %s: %w", version, err)
 	}
 
 	fmt.Printf("Switching to the newly installed Go version: %s\n", version)
-	local.SwitchGoVersion(version)
+	return local.SwitchGoVersion(version)
 }
 
-func installGoVersion(version, installPath string, isMainGoDir bool) error {
+func installGoVersion(version, installPath string) error {
 	filename := utils.BuildFilename(version)
-	fmt.Printf("Downloading %s, writing to: %s\n", filename, filepath.Join(tempDir, filename))
-	filePath, err := utils.DownloadFileWithProgress(utils.GoDownloadURL + filename)
+	fmt.Printf("Downloading %s\n", filename)
+	filePath, err := utils.DownloadArchive(utils.GoDownloadURL + filename)
 	if err != nil {
-		return fmt.Errorf("error downloading the file: %v", err)
+		return err
 	}
 
 	fmt.Println("Extracting the new Go version...")
-	if err := utils.ExtractTarGz(filePath, installPath, isMainGoDir); err != nil {
-		return fmt.Errorf("error extracting the Go archive: %v", err)
+	if err := utils.ExtractTarGz(filePath, installPath, false); err != nil {
+		return err
 	}
-
+	if !utils.GoTreeReady(installPath) {
+		return fmt.Errorf("extracted tree at %s is not a usable Go installation", installPath)
+	}
 	return nil
 }
