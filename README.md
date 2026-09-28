@@ -52,6 +52,12 @@ GOROOT set to: /usr/local/go
 GOPATH set to: /root/go
 ```
 
+## Configuration
+
+After a successful `install`, updatego writes `extract_root` to `~/.config/updatego/config.json`. Commands `update`, `status`, `list`, and `switch` use that directory (default `/usr/local` when the file is missing).
+
+`install --user` uses `$HOME/.local` as the extract root (`$HOME/.local/go` is GOROOT). GOPATH remains `$HOME/go`.
+
 ## Dependancies & Documentation
 [![Go Mod](https://img.shields.io/github/go-mod/go-version/earentir/updatego)]()
 
