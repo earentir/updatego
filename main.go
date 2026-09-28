@@ -36,6 +36,8 @@ func init() {
 	rootCmd.AddCommand(updateCmd)
 	rootCmd.AddCommand(listCmd)
 	rootCmd.AddCommand(switchCmd)
+	rootCmd.AddCommand(toolchainCmd)
+	rootCmd.AddCommand(syncCmd)
 }
 
 var (
@@ -113,7 +115,40 @@ var switchCmd = &cobra.Command{
 		if err := config.LoadIntoGlobal(); err != nil {
 			return err
 		}
-		return local.SwitchGoVersion(args[0])
+		version := args[0]
+		if err := local.SwitchGoVersion(version); err != nil {
+			return err
+		}
+		return local.ApplySwitchToolchain(version)
+	},
+}
+
+var toolchainCmd = &cobra.Command{
+	Use:   "toolchain [auto|local]",
+	Short: "Show or set GOTOOLCHAIN via the managed Go toolchain",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		if err := config.LoadIntoGlobal(); err != nil {
+			return err
+		}
+		mode := ""
+		if len(args) > 0 {
+			mode = args[0]
+		}
+		if len(args) > 1 {
+			return fmt.Errorf("too many arguments")
+		}
+		return local.RunToolchain(mode)
+	},
+}
+
+var syncCmd = &cobra.Command{
+	Use:   "sync",
+	Short: "Set GOTOOLCHAIN to the active managed Go version (goX.Y.Z)",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		if err := config.LoadIntoGlobal(); err != nil {
+			return err
+		}
+		return local.SyncGOTOOLCHAIN()
 	},
 }
 
