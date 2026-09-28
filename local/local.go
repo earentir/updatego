@@ -58,6 +58,8 @@ func CheckGoStatus() error {
 	} else {
 		fmt.Println("`go` binary is not in PATH.")
 	}
+
+	fmt.Printf("GOTOOLCHAIN (managed go): %s\n", GOTOOLCHAINForStatus())
 	return nil
 }
 
