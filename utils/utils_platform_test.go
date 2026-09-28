@@ -89,7 +89,7 @@ func TestFindVersionForCurrentPlatform(t *testing.T) {
 	}{
 		{"darwin", "arm64", "1.25.0"},
 		{"darwin", "amd64", "1.25.0"},
-		{"linux", "amd64", "1.24.9"},
+		{"linux", "amd64", "1.25.0"},
 		{"linux", "arm64", "1.25.0"},
 		{"windows", "amd64", "1.25.0"},
 	}

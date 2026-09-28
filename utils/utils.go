@@ -21,115 +21,21 @@ const (
 	GoDownloadURL = "https://go.dev/dl/"
 )
 
-// DownloadHTML downloads the HTML content from the provided URL
+// DownloadHTML downloads the HTML content from the provided URL.
 func DownloadHTML(url string) (string, error) {
-	resp, err := http.Get(url)
+	resp, err := httpGet(url)
 	if err != nil {
 		return "", err
 	}
-
-	defer func() {
-		if err := resp.Body.Close(); err != nil {
-			fmt.Println("Error closing response body:", err)
-		}
-	}()
-
+	defer closeBody(resp)
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("unexpected status code %d for %s", resp.StatusCode, url)
+	}
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return "", err
 	}
 	return string(body), nil
-}
-
-// DownloadFile downloads a file from the provided URL
-func DownloadFile(url string) (string, error) {
-	resp, err := http.Get(url)
-	if err != nil {
-		return "", err
-	}
-	defer func() {
-		if err := resp.Body.Close(); err != nil {
-			fmt.Println("Error closing response body:", err)
-		}
-	}()
-
-	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("unexpected status code: %d", resp.StatusCode)
-	}
-
-	tempDir := os.TempDir()
-	tempfile := filepath.Join(tempDir, regexp.MustCompile(`[^/]+$`).FindString(url))
-
-	fmt.Println("Writing to:", tempfile)
-
-	out, err := os.Create(tempfile)
-	if err != nil {
-		return "", err
-	}
-
-	defer func() {
-		if err := out.Close(); err != nil {
-			fmt.Println("Error closing response body:", err)
-		}
-	}()
-
-	_, err = io.Copy(out, resp.Body)
-	return out.Name(), err
-}
-
-// DownloadFileWithProgress downloads a file with a progress indicator
-func DownloadFileWithProgress(url string) (string, error) {
-	resp, err := http.Get(url)
-	if err != nil {
-		return "", err
-	}
-
-	defer func() {
-		if err := resp.Body.Close(); err != nil {
-			fmt.Println("Error closing response body:", err)
-		}
-	}()
-
-	fmt.Println("URL:", url)
-
-	tempDir := os.TempDir()
-	tempfile := filepath.Join(tempDir, regexp.MustCompile(`[^/]+$`).FindString(url))
-
-	fmt.Println("Writing to:", tempfile)
-
-	out, err := os.Create(tempfile)
-	if err != nil {
-		return "", err
-	}
-	defer func() {
-		if err := out.Close(); err != nil {
-			fmt.Println("Error closing response body:", err)
-		}
-	}()
-
-	var downloadedSize int64
-	buffer := make([]byte, 32*1024)
-	for {
-		n, err := resp.Body.Read(buffer)
-		if n > 0 {
-			_, writeErr := out.Write(buffer[:n])
-			if writeErr != nil {
-				return "", writeErr
-			}
-			downloadedSize += int64(n)
-			if downloadedSize%(500*1024) < int64(n) {
-				fmt.Print("#")
-			}
-		}
-		if err != nil {
-			if err == io.EOF {
-				break
-			}
-			return "", err
-		}
-	}
-	fmt.Println()
-	return out.Name(), nil
 }
 
 // ExtractTarGz extracts a tarball to a target directory
@@ -164,11 +70,9 @@ func ExtractTarGz(filePath, extractPath string, isMainGoDir bool) error {
 			return err
 		}
 
-		var targetPath string
-		if strings.HasPrefix(header.Name, "go/") {
-			targetPath = filepath.Join(extractPath, strings.TrimPrefix(header.Name, "go/"))
-		} else {
-			targetPath = filepath.Join(extractPath, header.Name)
+		targetPath, err := safeTarTarget(extractPath, header.Name)
+		if err != nil {
+			return err
 		}
 
 		switch header.Typeflag {
@@ -180,19 +84,15 @@ func ExtractTarGz(filePath, extractPath string, isMainGoDir bool) error {
 			if err := os.MkdirAll(filepath.Dir(targetPath), os.FileMode(0755)); err != nil {
 				return err
 			}
-			outFile, err := os.OpenFile(targetPath, os.O_CREATE|os.O_RDWR, os.FileMode(header.Mode))
+			outFile, err := os.OpenFile(targetPath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, os.FileMode(header.Mode))
 			if err != nil {
 				return err
 			}
-			if _, err := io.Copy(outFile, tarReader); err != nil {
-				err := outFile.Close()
-				if err != nil {
-					return err
-				}
-				return err
+			if _, copyErr := io.Copy(outFile, tarReader); copyErr != nil {
+				outFile.Close()
+				return copyErr
 			}
-			err = outFile.Close()
-			if err != nil {
+			if err := outFile.Close(); err != nil {
 				return err
 			}
 		case tar.TypeSymlink:
@@ -230,18 +130,6 @@ func platformParts(goos, goarch string) (osName, arch, ext string) {
 // in the HTML content from go.dev/dl.
 func FindVersion(htmlContent string) (string, error) {
 	return findVersionFor(htmlContent, runtime.GOOS, runtime.GOARCH)
-}
-
-func findVersionFor(htmlContent, goos, goarch string) (string, error) {
-	osName, arch, ext := platformParts(goos, goarch)
-	pattern := fmt.Sprintf(`go(\d+\.\d+\.\d+)\.%s-%s%s`,
-		regexp.QuoteMeta(osName), regexp.QuoteMeta(arch), regexp.QuoteMeta(ext))
-	regex := regexp.MustCompile(pattern)
-	matches := regex.FindStringSubmatch(htmlContent)
-	if len(matches) < 2 {
-		return "", fmt.Errorf("no version found for %s/%s", osName, arch)
-	}
-	return matches[1], nil
 }
 
 // BuildFilename builds the official Go archive filename for the current OS and architecture.
@@ -321,112 +209,48 @@ func VersionExists(htmlContent, filename string) bool {
 	return strings.Contains(htmlContent, filename)
 }
 
-// DetermineInstallPath determines the installation path
-func DetermineInstallPath(global, user bool, customPath string) string {
-	if global {
-		return "/usr/local/"
-	} else if user {
-		homeDir, err := os.UserHomeDir()
-		if err != nil {
-			fmt.Println("Error getting user home directory:", err)
-			os.Exit(1)
-		}
-		return homeDir
-	} else if customPath != "" {
-		return customPath
-	}
-	return "/usr/local/"
-}
-
-// BackupOldGo backs up the old Go folder
-func BackupOldGo(backupPath, goFullPath string) {
-	if _, err := os.Stat(backupPath); !os.IsNotExist(err) {
-		err := os.RemoveAll(backupPath)
-		if err != nil {
-			fmt.Println("Error removing old backup:", err)
-		}
-	}
-	if err := os.Rename(goFullPath, backupPath); err != nil {
-		fmt.Println("Error renaming the old Go folder:", err)
-		os.Exit(1)
-	}
-}
-
-// GetVersionToInstall returns the version to install
-func GetVersionToInstall(version string) string {
+// GetVersionToInstall resolves the version to install.
+func GetVersionToInstall(version string) (string, error) {
 	htmlContent, err := DownloadHTML(GoDownloadURL)
 	if err != nil {
-		fmt.Println("Error downloading HTML content:", err)
-		os.Exit(1)
+		return "", fmt.Errorf("error downloading HTML content: %w", err)
 	}
 
 	latestVersion, err := FindVersion(htmlContent)
 	if err != nil {
-		fmt.Println("Error finding the latest version:", err)
-		os.Exit(1)
+		return "", fmt.Errorf("error finding the latest version: %w", err)
 	}
 
 	if version == "" {
-		version = latestVersion
-	} else if version != latestVersion {
+		return latestVersion, nil
+	}
+	if version != latestVersion {
 		filename := BuildFilename(version)
 		if !VersionExists(htmlContent, filename) {
-			fmt.Printf("Requested version %s is not available. Latest version is %s.\n", version, latestVersion)
-			os.Exit(1)
+			return "", fmt.Errorf("requested version %s is not available; latest stable is %s", version, latestVersion)
 		}
 	}
-
-	return version
+	return version, nil
 }
 
-// DownloadAndVerifyFile downloads a file and verifies the write permission in the temp directory
-func DownloadAndVerifyFile(url string) (string, error) {
-	filePath, err := DownloadFile(url)
-	if err != nil {
-		return "", err
+// GoTreeReady reports whether path looks like a usable Go tree.
+func GoTreeReady(path string) bool {
+	if !IsDirExists(path) {
+		return false
 	}
-
-	tempFile, err := os.CreateTemp(os.TempDir(), "test_write_")
-	if err != nil {
-		fmt.Printf("No write permission in temp directory: %s\n", os.TempDir())
-		os.Exit(1)
-	}
-
-	fmt.Printf("Write permission confirmed in temp directory: %s\n", os.TempDir())
-	defer func() {
-		if err := tempFile.Close(); err != nil {
-			fmt.Println("Error closing response body:", err)
-		}
-	}()
-
-	err = os.Remove(tempFile.Name())
-	if err != nil {
-		fmt.Printf("Error removing temporary file: %s\n", tempFile.Name())
-	}
-
-	return filePath, nil
-}
-
-// SetEnvironmentVariables sets the GOROOT and GOPATH environment variables
-func SetEnvironmentVariables(goFullPath string) {
-	fmt.Println("Setting up environment variables...")
-	err := os.Setenv("GOROOT", goFullPath)
-	if err != nil {
-		fmt.Println("Error setting GOROOT:", err)
-	}
-	err = os.Setenv("GOPATH", filepath.Join(os.Getenv("HOME"), "go"))
-	if err != nil {
-		fmt.Println("Error setting GOPATH:", err)
-	}
-	fmt.Println("GOROOT set to:", goFullPath)
-	fmt.Println("GOPATH set to:", filepath.Join(os.Getenv("HOME"), "go"))
+	_, err := CheckGoVersion(path)
+	return err == nil
 }
 
 // DetermineInstallType determines the type of Go installation
 func DetermineInstallType(goFullPath string) string {
 	if strings.Contains(goFullPath, os.TempDir()) {
 		return "User"
-	} else if strings.Contains(goFullPath, "/usr/local/") {
+	}
+	if home, err := os.UserHomeDir(); err == nil && strings.Contains(goFullPath, filepath.Join(home, ".local")) {
+		return "User"
+	}
+	if strings.Contains(goFullPath, "/usr/local/") || goFullPath == filepath.Join("/usr/local", "go") {
 		return "Global"
 	}
 	return "Custom"
