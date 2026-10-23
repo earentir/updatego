@@ -14,52 +14,72 @@ import (
 // CheckGoStatus checks the status of the Go installation.
 func CheckGoStatus() error {
 	goFullPath := config.GlobalConfig.GoFullPath
+	rows := make([]statusRow, 0, 10)
 
 	if !utils.IsDirExists(goFullPath) {
-		fmt.Println("Go directory does not exist.")
+		printStatusTable([]statusRow{{
+			label:  "Directory",
+			kind:   statusFail,
+			detail: "missing (" + goFullPath + ")",
+		}})
 		return nil
 	}
-	fmt.Println("Go directory exists.")
+	rows = append(rows, statusRow{label: "Directory", kind: statusOK, detail: goFullPath})
 
 	goVersion, err := utils.CheckGoVersion(goFullPath)
 	if err != nil {
-		fmt.Println("Error checking Go version:", err)
+		rows = append(rows, statusRow{label: "Version", kind: statusFail, detail: err.Error()})
 	} else {
 		version, osArch := utils.ParseGoVersion(goVersion)
-		fmt.Printf("Go version: %s\n", version)
-		fmt.Printf("OS/Arch: %s\n", osArch)
+		rows = append(rows,
+			statusRow{label: "Version", kind: statusOK, detail: version},
+			statusRow{label: "OS/Arch", kind: statusInfo, detail: osArch},
+		)
 	}
 
 	if utils.IsWritable(goFullPath) {
-		fmt.Println("Go directory is writable.")
+		rows = append(rows, statusRow{label: "Writable", kind: statusOK, detail: "yes"})
 	} else {
-		fmt.Println("Go directory is not writable.")
+		rows = append(rows, statusRow{label: "Writable", kind: statusWarn, detail: "no"})
 	}
 
-	installType := utils.DetermineInstallType(goFullPath)
-	fmt.Printf("Install type: %s\n", installType)
-	fmt.Printf("Extract root: %s\n", config.GlobalConfig.GoExtractPathRoot)
+	rows = append(rows,
+		statusRow{label: "Install type", kind: statusInfo, detail: utils.DetermineInstallType(goFullPath)},
+		statusRow{label: "Extract root", kind: statusInfo, detail: config.GlobalConfig.GoExtractPathRoot},
+	)
 
-	if os.Getenv("GOROOT") == goFullPath {
-		fmt.Println("GOROOT environment variable is set correctly.")
+	if goroot := os.Getenv("GOROOT"); goroot == "" {
+		// Modern Go derives GOROOT from the binary; unset is normal.
+		rows = append(rows, statusRow{label: "GOROOT", kind: statusOK, detail: "unset (derived from binary)"})
+	} else if goroot == goFullPath {
+		rows = append(rows, statusRow{label: "GOROOT", kind: statusOK, detail: goroot})
 	} else {
-		fmt.Println("GOROOT environment variable is not set correctly.")
+		rows = append(rows, statusRow{label: "GOROOT", kind: statusFail, detail: goroot + " (want " + goFullPath + ")"})
 	}
 
 	expectedGOPATH := filepath.Join(os.Getenv("HOME"), "go")
-	if os.Getenv("GOPATH") == expectedGOPATH {
-		fmt.Println("GOPATH environment variable is set correctly.")
+	if gopath := os.Getenv("GOPATH"); gopath == "" {
+		rows = append(rows, statusRow{label: "GOPATH", kind: statusOK, detail: "unset (defaults to " + expectedGOPATH + ")"})
+	} else if gopath == expectedGOPATH {
+		rows = append(rows, statusRow{label: "GOPATH", kind: statusOK, detail: gopath})
 	} else {
-		fmt.Println("GOPATH environment variable is not set correctly.")
+		rows = append(rows, statusRow{label: "GOPATH", kind: statusWarn, detail: gopath + " (default would be " + expectedGOPATH + ")"})
 	}
 
 	if utils.IsGoInPath(goFullPath) {
-		fmt.Println("`go` binary is in PATH.")
+		rows = append(rows, statusRow{label: "PATH", kind: statusOK, detail: "go binary present"})
 	} else {
-		fmt.Println("`go` binary is not in PATH.")
+		rows = append(rows, statusRow{label: "PATH", kind: statusFail, detail: "go binary not in PATH"})
 	}
 
-	fmt.Printf("GOTOOLCHAIN (managed go): %s\n", GOTOOLCHAINForStatus())
+	toolchain := GOTOOLCHAINForStatus()
+	kind := statusOK
+	if strings.HasPrefix(toolchain, "unavailable") {
+		kind = statusWarn
+	}
+	rows = append(rows, statusRow{label: "GOTOOLCHAIN", kind: kind, detail: toolchain})
+
+	printStatusTable(rows)
 	return nil
 }
 
