@@ -3,6 +3,7 @@ package utils
 import (
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -16,9 +17,13 @@ import (
 	"updatego/config"
 )
 
-const metadataTimeout = 30 * time.Second
+const (
+	metadataTimeout = 30 * time.Second
+	downloadTimeout = 30 * time.Minute
+)
 
-var downloadClient = &http.Client{Timeout: metadataTimeout}
+var metadataClient = &http.Client{Timeout: metadataTimeout}
+var downloadClient = &http.Client{Timeout: downloadTimeout}
 
 // RefuseWindows returns an error when zip-based installs are not supported.
 func RefuseWindows() error {
@@ -50,6 +55,59 @@ func configTempDir() string {
 		return config.GlobalConfig.TempDir
 	}
 	return os.TempDir()
+}
+
+type dlRelease struct {
+	Version string   `json:"version"`
+	Stable  bool     `json:"stable"`
+	Files   []dlFile `json:"files"`
+}
+
+type dlFile struct {
+	Filename string `json:"filename"`
+	SHA256   string `json:"sha256"`
+	Kind     string `json:"kind"`
+}
+
+// sha256FromDLJSON finds the SHA256 for filename in go.dev/?mode=json payload.
+func sha256FromDLJSON(data []byte, filename string) (string, error) {
+	var releases []dlRelease
+	if err := json.Unmarshal(data, &releases); err != nil {
+		return "", fmt.Errorf("invalid go.dev download metadata: %w", err)
+	}
+	for _, r := range releases {
+		for _, f := range r.Files {
+			if f.Filename == filename && f.SHA256 != "" {
+				return f.SHA256, nil
+			}
+		}
+	}
+	return "", fmt.Errorf("no SHA256 found for %s in go.dev download metadata", filename)
+}
+
+// fetchSHA256ForFilename looks up the archive checksum via go.dev/?mode=json.
+// Sidecar URLs like *.tar.gz.sha256 are not published; they return HTML.
+func fetchSHA256ForFilename(filename string) (string, error) {
+	resp, err := metadataClient.Get(GoDownloadURL + "?mode=json")
+	if err != nil {
+		return "", err
+	}
+	defer closeBody(resp)
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("unexpected status code %d for download metadata", resp.StatusCode)
+	}
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", err
+	}
+	sum, err := sha256FromDLJSON(body, filename)
+	if err != nil {
+		return "", err
+	}
+	if len(sum) != 64 || strings.Trim(sum, "0123456789abcdefABCDEF") != "" {
+		return "", fmt.Errorf("invalid SHA256 for %s: %q", filename, sum)
+	}
+	return sum, nil
 }
 
 // DownloadArchive downloads an archive to a temp file and verifies its SHA256 checksum.
@@ -112,35 +170,14 @@ func DownloadArchive(fileURL string) (string, error) {
 		return "", fmt.Errorf("downloaded file is empty")
 	}
 
-	sumURL := fileURL + ".sha256"
-	expected, err := fetchSHA256Sum(sumURL)
+	expected, err := fetchSHA256ForFilename(filename)
 	if err != nil {
 		return "", err
 	}
 	actual := hex.EncodeToString(hasher.Sum(nil))
 	if !strings.EqualFold(actual, expected) {
-		return "", fmt.Errorf("checksum mismatch for %s", filename)
+		return "", fmt.Errorf("checksum mismatch for %s: got %s, want %s", filename, actual, expected)
 	}
 
 	return tempfile, nil
-}
-
-func fetchSHA256Sum(sumURL string) (string, error) {
-	resp, err := httpGet(sumURL)
-	if err != nil {
-		return "", err
-	}
-	defer closeBody(resp)
-	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("unexpected status code %d for %s", resp.StatusCode, sumURL)
-	}
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return "", err
-	}
-	fields := strings.Fields(string(body))
-	if len(fields) < 1 {
-		return "", fmt.Errorf("invalid checksum file at %s", sumURL)
-	}
-	return fields[0], nil
 }
