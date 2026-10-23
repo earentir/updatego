@@ -160,21 +160,12 @@ func RemoveGoFolder(path string) error {
 // IsWritable checks if a path is writable
 func IsWritable(path string) bool {
 	tmpFilePath := filepath.Join(path, ".tmp-check")
-	defer func() {
-		if err := os.Remove(tmpFilePath); err != nil {
-			fmt.Println("Error closing response body:", err)
-		}
-	}()
-
 	file, err := os.Create(tmpFilePath)
 	if err != nil {
 		return false
 	}
-	defer func() {
-		if err := file.Close(); err != nil {
-			fmt.Println("Error closing response body:", err)
-		}
-	}()
+	_ = file.Close()
+	_ = os.Remove(tmpFilePath)
 	return true
 }
 
