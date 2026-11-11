@@ -5,15 +5,15 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/spf13/cobra"
+
 	"updatego/config"
 	"updatego/installer"
 	"updatego/local"
 	"updatego/update"
-
-	"github.com/spf13/cobra"
 )
 
-var appversion = "1.3.41"
+var appversion = "1.3.47"
 
 var verbose bool
 
