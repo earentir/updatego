@@ -22,8 +22,12 @@ func InstallGo(version string, force, global, user bool, customPath string) erro
 	}
 	config.ApplyExtractRoot(extractRoot)
 
-	if !utils.IsWritable(config.GlobalConfig.GoExtractPathRoot) {
-		return fmt.Errorf("installation directory %s is not writable", config.GlobalConfig.GoExtractPathRoot)
+	if err := utils.CheckInstallPermissions(
+		config.GlobalConfig.GoExtractPathRoot,
+		config.GlobalConfig.GoFullPath,
+		config.GlobalConfig.TempDir,
+	); err != nil {
+		return err
 	}
 
 	if version == "" {

@@ -136,6 +136,14 @@ func SwitchGoVersion(version string) error {
 		return nil
 	}
 
+	if err := utils.CheckInstallPermissions(
+		config.GlobalConfig.GoExtractPathRoot,
+		config.GlobalConfig.GoFullPath,
+		config.GlobalConfig.TempDir,
+	); err != nil {
+		return err
+	}
+
 	if err := ensureVersionExists(version, targetPath); err != nil {
 		return err
 	}

@@ -13,6 +13,13 @@ func Go() error {
 	if err := utils.RefuseWindows(); err != nil {
 		return err
 	}
+	if err := utils.CheckInstallPermissions(
+		config.GlobalConfig.GoExtractPathRoot,
+		config.GlobalConfig.GoFullPath,
+		config.GlobalConfig.TempDir,
+	); err != nil {
+		return err
+	}
 
 	fmt.Println("Downloading Go Data to get the latest version...")
 	htmlContent, err := utils.DownloadHTML(utils.GoDownloadURL)
