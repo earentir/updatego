@@ -8,7 +8,6 @@ import (
 	"io"
 	"net/http"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"regexp"
 	"runtime"
@@ -173,16 +172,6 @@ func IsWritable(path string) bool {
 func DirNotEmpty(path string) bool {
 	files, err := os.ReadDir(path)
 	return err == nil && len(files) > 0
-}
-
-// CheckGoVersion checks the Go version in the provided path
-func CheckGoVersion(path string) (string, error) {
-	goVersionPath := filepath.Join(path, "bin", "go")
-	output, err := exec.Command(goVersionPath, "version").Output()
-	if err != nil {
-		return "", err
-	}
-	return string(output), nil
 }
 
 // ParseGoVersion parses the Go version and OS/Arch from the output

@@ -3,7 +3,6 @@ package local
 import (
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 
@@ -25,8 +24,7 @@ func runManagedGo(args ...string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	cmd := exec.Command(bin, args...)
-	out, err := cmd.CombinedOutput()
+	out, err := utils.RunGoTree(config.GlobalConfig.GoFullPath, args...)
 	if err != nil {
 		return "", fmt.Errorf("%s %s: %w\n%s", bin, strings.Join(args, " "), err, strings.TrimSpace(string(out)))
 	}
@@ -73,11 +71,11 @@ func SyncGOTOOLCHAIN() error {
 	if err := utils.RefuseWindows(); err != nil {
 		return err
 	}
-	out, err := runManagedGo("version")
+	out, err := utils.CheckGoVersion(config.GlobalConfig.GoFullPath)
 	if err != nil {
 		return err
 	}
-	version, _ := utils.ParseGoVersion(out + "\n")
+	version, _ := utils.ParseGoVersion(out)
 	if version == "" || version == "Unknown version" {
 		return fmt.Errorf("could not parse Go version from: %s", out)
 	}
