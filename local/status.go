@@ -10,14 +10,13 @@ import (
 type statusKind int
 
 const (
-	statusInfo statusKind = iota
-	statusOK
+	statusOK statusKind = iota
 	statusWarn
 	statusFail
 )
 
-type statusRow struct {
-	label  string
+type checkRow struct {
+	test   string
 	kind   statusKind
 	detail string
 }
@@ -53,24 +52,73 @@ func statusMark(kind statusKind, enabled bool) string {
 	}
 }
 
-func printStatusTable(rows []statusRow) {
+func printCheckTable(rows []checkRow) {
 	enabled := colorEnabled()
-	labelWidth := 0
+	testWidth := utf8.RuneCountInString("Test")
+	statusHeader := "Status"
+	statusWidth := utf8.RuneCountInString(statusHeader)
 	for _, r := range rows {
-		if n := utf8.RuneCountInString(r.label); n > labelWidth {
-			labelWidth = n
+		if n := utf8.RuneCountInString(r.test); n > testWidth {
+			testWidth = n
+		}
+		if n := utf8.RuneCountInString(visibleStatusMark(r.kind)); n > statusWidth {
+			statusWidth = n
 		}
 	}
-	// "fail"/"warn"/"ok"/"-" ; pad on visible width only (ANSI ignored).
-	markWidth := 4
+
+	fmt.Printf("%s%s  %s%s  %s\n",
+		"Test", strings.Repeat(" ", testWidth-utf8.RuneCountInString("Test")),
+		statusHeader, strings.Repeat(" ", statusWidth-utf8.RuneCountInString(statusHeader)),
+		"Details",
+	)
 
 	for _, r := range rows {
 		mark := statusMark(r.kind, enabled)
-		pad := strings.Repeat(" ", labelWidth-utf8.RuneCountInString(r.label))
+		testPad := strings.Repeat(" ", testWidth-utf8.RuneCountInString(r.test))
 		visibleMark := visibleStatusMark(r.kind)
-		markPad := strings.Repeat(" ", markWidth-utf8.RuneCountInString(visibleMark))
-		fmt.Printf("%s%s  %s%s  %s\n", r.label, pad, mark, markPad, paintDetail(enabled, r.kind, r.detail))
+		statusPad := strings.Repeat(" ", statusWidth-utf8.RuneCountInString(visibleMark))
+		fmt.Printf("%s%s  %s%s  %s\n", r.test, testPad, mark, statusPad, paintDetail(enabled, r.kind, r.detail))
 	}
+}
+
+func printCheckSummary(rows []checkRow, unit string) {
+	var pass, warn, fail int
+	for _, r := range rows {
+		switch r.kind {
+		case statusOK:
+			pass++
+		case statusWarn:
+			warn++
+		case statusFail:
+			fail++
+		}
+	}
+	enabled := colorEnabled()
+	total := pass + warn + fail
+	fmt.Println()
+	if !enabled {
+		line := fmt.Sprintf("%d %s: %d passed", total, unit, pass)
+		if warn > 0 {
+			line += fmt.Sprintf(", %d warned", warn)
+		}
+		if fail > 0 {
+			line += fmt.Sprintf(", %d failed", fail)
+		}
+		fmt.Println(line)
+		return
+	}
+	var b strings.Builder
+	fmt.Fprintf(&b, "%d %s: ", total, unit)
+	b.WriteString(paint(enabled, "32", fmt.Sprintf("%d passed", pass)))
+	if warn > 0 {
+		b.WriteString(", ")
+		b.WriteString(paint(enabled, "33", fmt.Sprintf("%d warned", warn)))
+	}
+	if fail > 0 {
+		b.WriteString(", ")
+		b.WriteString(paint(enabled, "31", fmt.Sprintf("%d failed", fail)))
+	}
+	fmt.Println(b.String())
 }
 
 func visibleStatusMark(kind statusKind) string {

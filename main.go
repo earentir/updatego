@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"os"
 
@@ -20,6 +21,8 @@ var rootCmd = &cobra.Command{
 	Use:   "updatego",
 	Short: "A simple golang version manager",
 	Long:  "A simple golang version manager",
+	SilenceUsage:  true,
+	SilenceErrors: true,
 	PersistentPreRun: func(cmd *cobra.Command, args []string) {
 		config.GlobalConfig.Verbose = verbose
 	},
@@ -31,7 +34,8 @@ func init() {
 	rootCmd.SetVersionTemplate("updatego {{.Version}}\n")
 
 	rootCmd.AddCommand(installCmd)
-	rootCmd.AddCommand(statusCmd)
+	rootCmd.AddCommand(currentCmd)
+	rootCmd.AddCommand(testCmd)
 	rootCmd.AddCommand(latestCmd)
 	rootCmd.AddCommand(updateCmd)
 	rootCmd.AddCommand(listCmd)
@@ -66,14 +70,31 @@ func runInstall(cmd *cobra.Command, args []string) error {
 	return installer.InstallGo(installVersion, installForce, installGlobal, installUser, installCustomPath)
 }
 
-var statusCmd = &cobra.Command{
-	Use:   "status",
-	Short: "Check Go installation status",
+var currentBrief bool
+
+var currentCmd = &cobra.Command{
+	Use:   "current",
+	Short: "Show current Go version and verify installation",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if err := config.LoadIntoGlobal(); err != nil {
 			return err
 		}
-		return local.CheckGoStatus()
+		return local.RunCurrent(currentBrief)
+	},
+}
+
+func init() {
+	currentCmd.Flags().BoolVar(&currentBrief, "brief", false, "Print only the Go version")
+}
+
+var testCmd = &cobra.Command{
+	Use:   "test",
+	Short: "Test install permissions (no download or changes)",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		if err := config.LoadIntoGlobal(); err != nil {
+			return err
+		}
+		return local.RunTest()
 	},
 }
 
@@ -154,7 +175,10 @@ var syncCmd = &cobra.Command{
 
 func main() {
 	if err := rootCmd.Execute(); err != nil {
-		fmt.Println(err)
+		var reportExit local.ReportExit
+		if !errors.As(err, &reportExit) && err.Error() != "" {
+			fmt.Println(err)
+		}
 		os.Exit(1)
 	}
 }
